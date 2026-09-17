@@ -1,67 +1,94 @@
 """Command-line interface for the Star Gazing Weather agent.
 
-Thin wrapper around ``run()``: owns only argument parsing and I/O, so the
-agent loop in ``agent.py`` stays a pure library function. Registered as the
-``star-gazing-weather-agent`` console script and reachable via
-``python -m star_gazing_weather_agent``.
+Typer + Rich front-end: renders the agent's final answer as a markdown panel
+and shows a live spinner while the model is being asked. Reachable as the
+``star-gazing-weather-agent`` console script and ``python -m star_gazing_weather_agent``,
+both funneling through ``main()``.
 """
 
-import argparse
 import asyncio
 import logging
+from typing import Annotated
 
-from .agent import MAX_ITERATIONS, run
+import typer
+from rich.console import Console
+from rich.markdown import Markdown
+from rich.panel import Panel
+
+from .agent import MAX_ITERATIONS, run, settings
 from .messages import ChatMessage
 
 log = logging.getLogger("star-gazing-weather-agent")
+console = Console()
 
 DEFAULT_QUESTION = (
     "Please check the forecast and moon phase for Mauna Kea for tonight. "
     "Use your tools."
 )
 
+SYSTEM_PROMPT = (
+    "You help decide whether tonight is good for telescope observing. "
+    "When the user names an observing site, first resolve it to WGS84 "
+    "decimal-degree coordinates and pass them to get_forecast(lat, lon) "
+    "— the tool takes coordinates, not site names. If you do not know "
+    "the site's coordinates, ask the user for them. To know today's "
+    "date for a location call get_todays_date(location) — never guess "
+    "the date, midnights differ by timezone. Use your tools; never "
+    "guess data."
+)
 
-async def _amain() -> None:
-    parser = argparse.ArgumentParser(
-        description="Decide if tonight is good for telescope observing."
-    )
-    parser.add_argument(
-        "question",
-        nargs="*",
-        help="the question to ask the agent (quoted or not)",
-    )
-    args = parser.parse_args()
 
-    question: str = " ".join(args.question) or DEFAULT_QUESTION
-
-    messages: list[ChatMessage] = [
-        ChatMessage(
-            role="system",
-            content=(
-                "You help decide whether tonight is good for telescope observing. "
-                "When the user names an observing site, first resolve it to WGS84 "
-                "decimal-degree coordinates and pass them to get_forecast(lat, lon) "
-                "— the tool takes coordinates, not site names. If you do not know "
-                "the site's coordinates, ask the user for them. To know today's "
-                "date for a location call get_todays_date(location) — never guess "
-                "the date, midnights differ by timezone. Use your tools; never "
-                "guess data."
-            ),
+def ask(
+    question: Annotated[
+        list[str] | None,
+        typer.Argument(help="the question to ask the agent"),
+    ] = None,
+    verbose: Annotated[
+        int,
+        typer.Option(
+            "--verbose",
+            "-v",
+            count=True,
+            help="repeat to raise log verbosity: -v INFO, -vv DEBUG",
         ),
-        ChatMessage(role="user", content=question),
+    ] = 0,
+) -> None:
+    """Decide if tonight is good for telescope observing."""
+    root_log_level = logging.WARNING
+    if verbose >= 2:
+        root_log_level = logging.DEBUG
+    elif verbose == 1:
+        root_log_level = logging.INFO
+    logging.getLogger().setLevel(root_log_level)
+
+    text = " ".join(question) if question else DEFAULT_QUESTION
+    messages = [
+        ChatMessage(role="system", content=SYSTEM_PROMPT),
+        ChatMessage(role="user", content=text),
     ]
 
-    answer: str | None = await run(messages)
+    try:
+        with console.status(
+            f"[cyan]Asking {settings.qualified_model}…[/]", spinner="dots"
+        ):
+            answer = asyncio.run(run(messages))
+    except Exception as e:
+        console.print(Panel(str(e), title="Error", border_style="red", padding=(1, 2)))
+        raise typer.Exit(code=1)
+
     if answer is None:
+        console.print(
+            f"[yellow]No answer after {MAX_ITERATIONS} iterations — raising the "
+            "cap or rephrasing may help.[/]"
+        )
         log.warning("hit iteration cap of %d without a final answer", MAX_ITERATIONS)
     else:
+        console.print(
+            Panel(Markdown(answer), title="Answer", border_style="cyan", padding=(1, 2))
+        )
         log.info("answer=%s", answer)
 
 
 def main() -> None:
-    """Console-script entry: run the async agent loop in a fresh event loop."""
-    asyncio.run(_amain())
-
-
-if __name__ == "__main__":
-    main()
+    """Console-script and ``python -m`` entry point."""
+    typer.run(ask)
