@@ -11,8 +11,14 @@ with tool calls.
 ## Setup
 
 ```bash
+make env    # copies .env.tmp to .env — then edit it
 uv sync
 ```
+
+The agent calls the model through LiteLLM, which supports any of its many
+providers (Groq, OpenAI, Anthropic, local endpoints, ...). Fill `API_KEY`,
+`PROVIDER` and `MODEL` in `.env` with a key that the provider you picked
+accepts — then run the agent.
 
 ## Run
 

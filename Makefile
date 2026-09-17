@@ -1,4 +1,8 @@
-.PHONY: format typecheck test
+.PHONY: env format typecheck test
+
+env:
+	@if [ ! -f .env ]; then cp .env.tmp .env && echo "Created .env from .env.tmp — fill in your API key."; \
+	else echo ".env already exists — leaving it alone."; fi
 
 format:
 	uv run ruff format .
