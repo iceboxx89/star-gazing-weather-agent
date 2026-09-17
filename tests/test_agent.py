@@ -14,7 +14,7 @@ from litellm import ModelResponse
 from litellm.types.utils import ChatCompletionMessageToolCall, Choices, Message
 
 import star_gazing_weather_agent.agent as ask
-from star_gazing_weather_agent.agent import run
+from star_gazing_weather_agent.agent import ask_agent, run
 from star_gazing_weather_agent.messages import ChatMessage
 
 
@@ -200,27 +200,107 @@ def test_happy_path_two_tool_calls_then_final_answer(
     ]
 
 
-def test_no_tool_calls_exits_immediately(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Unhappy path: no tool calls in the reply, the loop exits immediately.
+def test_help_intent_returns_usage_text() -> None:
+    """A how-do-I-use-this question is answered by the gate with usage text —
+    no tools, one model call."""
+    messages = [ChatMessage(role="user", content="how do i use this tool?")]
+    fake = fake_model_with([answer_message("HELP")])
 
-    The tools are faked as an empty registry: any dispatch attempt would
-    produce "tool not found", so a clean exit also proves nothing was called.
-    """
+    answer = asyncio.run(ask_agent("how do i use this tool?", model_fn=fake))
+
+    assert answer == ask.HELP_MESSAGE
+    assert fake.call_count == 1
+
+
+def test_unknown_intent_reply_fails_closed() -> None:
+    """A classifier reply that matches no token refuses by default: off-topic
+    and ambiguous questions both get the refusal, one model call."""
+    fake = fake_model_with([answer_message("sure, ask me anything!")])
+
+    answer = asyncio.run(ask_agent("anything goes?", model_fn=fake))
+
+    assert answer == ask.REFUSAL_MESSAGE
+    assert fake.call_count == 1
+
+
+def test_other_intent_returns_refusal() -> None:
+    """An off-topic question is refused by the gate itself: one model call,
+    deterministic refusal, no loop, no tools."""
+    fake = fake_model_with([answer_message("OTHER")])
+
+    answer = asyncio.run(ask_agent("what is the capital of France?", model_fn=fake))
+
+    assert answer == ask.REFUSAL_MESSAGE
+    assert fake.call_count == 1
+
+
+def test_observe_intent_runs_the_loop(monkeypatch: pytest.MonkeyPatch) -> None:
+    """An observing question passes the gate and runs the loop to a grounded
+    answer. The gate consumes OBSERVE, then the loop runs tool call + answer."""
     monkeypatch.setattr(ask, "TOOL_REGISTRY", {})
-    messages = [ChatMessage(role="user", content="any news?")]
-    fake = fake_model_with([answer_message("Nope, all quiet.")])
+    fake = fake_model_with(
+        [
+            answer_message("OBSERVE"),
+            tool_call_message("get_forecast", "{}"),
+            answer_message("Clear skies tonight."),
+        ]
+    )
+
+    answer = asyncio.run(ask_agent("is tonight good at Mauna Kea?", model_fn=fake))
+
+    assert answer == "Clear skies tonight."
+    assert fake.call_count == 3
+
+
+def test_non_observing_question_is_refused() -> None:
+    """A tool-less reply carrying the refusal prefix ends the loop at once:
+    the model declined rather than dodged, so no steering or tools are needed."""
+    messages = [ChatMessage(role="user", content="what is the capital of France?")]
+    fake = fake_model_with(
+        [answer_message("REFUSED: I only answer observing questions.")]
+    )
 
     answer = asyncio.run(run(messages, model_fn=fake, max_iterations=3))
 
-    assert answer == "Nope, all quiet."
-    # One model call and done — the script has one answer left, so a second
-    # call would raise IndexError, but we assert the count explicitly anyway.
+    assert answer == "REFUSED: I only answer observing questions."
     assert fake.call_count == 1
     assert [m.role for m in messages] == ["user", "assistant"]
-    assert messages[1].content == "Nope, all quiet."
-    assert messages[1].tool_calls is None
+
+
+def test_tool_less_reply_is_steered_back_to_tools(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A reply with no tool calls before any tool ran is not the answer.
+
+    The model is sent back with a nudge to use its tools; only a reply that
+    follows a tool observation terminates the loop. Empty registry: the forced
+    forecast call fails as "tool not found", still an observation.
+    """
+    monkeypatch.setattr(ask, "TOOL_REGISTRY", {})
+    messages = [ChatMessage(role="user", content="any news?")]
+    fake = fake_model_with(
+        [
+            answer_message("Nope, all quiet."),
+            tool_call_message("get_forecast", "{}"),
+            answer_message("Forecast says clear."),
+        ]
+    )
+
+    answer = asyncio.run(run(messages, model_fn=fake, max_iterations=5))
+
+    assert answer == "Forecast says clear."
+    assert [m.role for m in messages] == [
+        "user",
+        "assistant",
+        "user",
+        "assistant",
+        "tool",
+        "assistant",
+    ]
+    assert fake.call_count == 3
+    # The nudge reached the model: the second request ends with the steering
+    # message, and the third is already grounded in the failed tool call.
+    assert "did not call any of your tools" in fake.requests[1][-1]["content"]
 
 
 def test_run_unknown_tool_reports_error() -> None:

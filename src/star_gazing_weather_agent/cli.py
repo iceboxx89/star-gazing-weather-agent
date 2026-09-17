@@ -15,22 +15,10 @@ from rich.console import Console
 from rich.markdown import Markdown
 from rich.panel import Panel
 
-from .agent import MAX_ITERATIONS, run, settings
-from .messages import ChatMessage
+from .agent import MAX_ITERATIONS, ask_agent, settings
 
 log = logging.getLogger("star-gazing-weather-agent")
 console = Console()
-
-SYSTEM_PROMPT = (
-    "You help decide whether tonight is good for telescope observing. "
-    "When the user names an observing site, first resolve it to WGS84 "
-    "decimal-degree coordinates and pass them to get_forecast(lat, lon) "
-    "— the tool takes coordinates, not site names. If you do not know "
-    "the site's coordinates, ask the user for them. To know today's "
-    "date for a location call get_todays_date(location) — never guess "
-    "the date, midnights differ by timezone. Use your tools; never "
-    "guess data."
-)
 
 
 def ask(
@@ -68,16 +56,12 @@ def ask(
         raise typer.Exit(code=2)
 
     text = " ".join(question)
-    messages = [
-        ChatMessage(role="system", content=SYSTEM_PROMPT),
-        ChatMessage(role="user", content=text),
-    ]
 
     try:
         with console.status(
             f"[cyan]Asking {settings.qualified_model}…[/]", spinner="dots"
         ):
-            answer = asyncio.run(run(messages))
+            answer = asyncio.run(ask_agent(text))
     except Exception as e:
         console.print(Panel(str(e), title="Error", border_style="red", padding=(1, 2)))
         raise typer.Exit(code=1)

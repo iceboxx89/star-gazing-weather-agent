@@ -10,11 +10,18 @@ with tool calls.
 
 ```mermaid
 flowchart LR
-    Q[Question] --> M[Model]
+    Q[Question] --> G{Intent gate}
+    G -- help --> H[Usage text]
+    G -- other --> R[Refused]
+    G -- observing --> M[Model]
     M -->|needs more data| T[Tools]
     T --> M
     M -->|answer ready| Stop[Stop]
 ```
+
+A cheap intent gate first decides whether the question is about observing
+(OBSERVE), tool usage (HELP), or neither (refused) — the observing loop only
+runs for OBSERVE.
 
 ## Setup
 
