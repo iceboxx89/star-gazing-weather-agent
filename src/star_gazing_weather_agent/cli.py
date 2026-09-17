@@ -21,11 +21,6 @@ from .messages import ChatMessage
 log = logging.getLogger("star-gazing-weather-agent")
 console = Console()
 
-DEFAULT_QUESTION = (
-    "Please check the forecast and moon phase for Mauna Kea for tonight. "
-    "Use your tools."
-)
-
 SYSTEM_PROMPT = (
     "You help decide whether tonight is good for telescope observing. "
     "When the user names an observing site, first resolve it to WGS84 "
@@ -39,9 +34,12 @@ SYSTEM_PROMPT = (
 
 
 def ask(
+    ctx: typer.Context,
     question: Annotated[
         list[str] | None,
-        typer.Argument(help="the question to ask the agent"),
+        typer.Argument(
+            help='the question to ask, e.g. "Is tonight good at Mauna Kea?"'
+        ),
     ] = None,
     verbose: Annotated[
         int,
@@ -61,7 +59,15 @@ def ask(
         root_log_level = logging.INFO
     logging.getLogger().setLevel(root_log_level)
 
-    text = " ".join(question) if question else DEFAULT_QUESTION
+    if not question:
+        console.print(
+            "[yellow]No question given — type the observing question you want "
+            'answered, e.g. "Is tonight good at Mauna Kea?"[/]'
+        )
+        console.print(ctx.get_help())
+        raise typer.Exit(code=2)
+
+    text = " ".join(question)
     messages = [
         ChatMessage(role="system", content=SYSTEM_PROMPT),
         ChatMessage(role="user", content=text),
