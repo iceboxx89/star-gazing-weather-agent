@@ -8,6 +8,8 @@ The function is the source of truth: its name, docstring and signature drive
 the schema the model sees (via litellm) and the registry the loop dispatches to.
 """
 
+# litellm.utils.function_to_dict reflects signatures via annotation.__name__,
+# which fails on `X | None` (types.UnionType) — keep Optional here (2026-09-17).
 from collections.abc import Callable
 from datetime import datetime, timedelta, timezone
 from typing import Any, Optional, TypedDict

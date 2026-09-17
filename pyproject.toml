@@ -10,12 +10,9 @@ requires-python = ">=3.10"
 dependencies = [
     "httpx>=0.28.1",
     "litellm>=1.83.0",
-    "numpydoc>=1.11.0",
-    "openai>=3.14.0",
     "pydantic>=2.13.5",
     "pydantic-settings>=2.15.0",
     "rich>=15.0.0",
-    "ruff>=0.16.7",
     "typer>=0.27.2",
 ]
 
@@ -26,6 +23,7 @@ star-gazing-weather-agent = "star_gazing_weather_agent.cli:main"
 dev = [
     "mypy>=2.3.1",
     "pytest>=9.1.1",
+    "ruff>=0.16.7",
 ]
 
 [tool.pytest.ini_options]
