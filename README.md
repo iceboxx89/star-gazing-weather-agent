@@ -8,6 +8,14 @@ with tool calls.
 - **Tools:** forecast and moon-phase stubs, plus `get_todays_date` which
   resolves an observing location to its timezone for the correct locale date
 
+```mermaid
+flowchart LR
+    Q[Question] --> M[Model]
+    M -->|needs more data| T[Tools]
+    T --> M
+    M -->|answer ready| Stop[Stop]
+```
+
 ## Setup
 
 ```bash
