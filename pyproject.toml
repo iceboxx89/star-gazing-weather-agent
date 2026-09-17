@@ -1,0 +1,41 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "star-gazing-weather-agent"
+version = "0.1.0"
+description = "Clear Sky observing advisor: decide if tonight is good for telescope observing."
+requires-python = ">=3.10"
+dependencies = [
+    "httpx>=0.28.1",
+    "litellm>=1.83.0",
+    "numpydoc>=1.11.0",
+    "openai>=3.14.0",
+    "pydantic>=2.13.5",
+    "pydantic-settings>=2.15.0",
+    "ruff>=0.16.7",
+]
+
+[project.scripts]
+star-gazing-weather-agent = "star_gazing_weather_agent.cli:main"
+
+[dependency-groups]
+dev = [
+    "mypy>=2.3.1",
+    "pytest>=9.1.1",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/star_gazing_weather_agent"]
+
+[tool.mypy]
+python_version = "3.10"
+ignore_missing_imports = true
+disallow_any_generics = true
+explicit_package_bases = true
+mypy_path = ["src"]
