@@ -93,31 +93,37 @@ class StarGazingWeatherAgent(AgentBase):
             )
 
             # State: EXECUTE_TOOLS
-            for tc in tool_calls:
-                log.info(
-                    "tool_call: id=%s name=%s args=%s",
-                    tc.id,
-                    tc.function.name,
-                    tc.function.arguments,
-                )
-                assert (
-                    tc.function.name is not None
-                )  # a nameless tool call is a provider bug
-                fn: Callable[..., Any] | None = TOOL_REGISTRY.get(tc.function.name)
-                if fn is None:
-                    result = f"tool not found: {tc.function.name}"
-                    log.error(result)
-                else:
-                    try:
-                        args = json.loads(tc.function.arguments)
-                        result = await fn(**args)
-                    except Exception as e:
-                        result = f"tool error: {e}"
-                    log.info("result: %s", result)
-                # Observe: feed the result back, keyed to the call that asked for it.
-                messages.append(
-                    ChatMessage(
-                        role="tool", tool_call_id=tc.id, content=json.dumps(result)
-                    )
-                )
+            await self._execute_tools(messages, tool_calls)
         return None
+
+    async def _execute_tools(
+        self,
+        messages: list[ChatMessage],
+        tool_calls: list[ChatCompletionMessageToolCall],
+    ) -> None:
+        """Run each requested tool and append its observation to the transcript."""
+        for tc in tool_calls:
+            log.info(
+                "tool_call: id=%s name=%s args=%s",
+                tc.id,
+                tc.function.name,
+                tc.function.arguments,
+            )
+            assert (
+                tc.function.name is not None
+            )  # a nameless tool call is a provider bug
+            fn: Callable[..., Any] | None = TOOL_REGISTRY.get(tc.function.name)
+            if fn is None:
+                result = f"tool not found: {tc.function.name}"
+                log.error(result)
+            else:
+                try:
+                    args = json.loads(tc.function.arguments)
+                    result = await fn(**args)
+                except Exception as e:
+                    result = f"tool error: {e}"
+                log.info("result: %s", result)
+            # Observe: feed the result back, keyed to the call that asked for it.
+            messages.append(
+                ChatMessage(role="tool", tool_call_id=tc.id, content=json.dumps(result))
+            )
