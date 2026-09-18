@@ -24,6 +24,8 @@ A cheap intent gate first decides whether the question is about observing
 runs for OBSERVE. The gate returns an `Intent` enum, and the orchestrator
 routes on it with one `match`.
 
+![Clear Sky demo](resources/str-1.gif)
+
 ## Architecture
 
 Layers are strictly separated, with the UI at the top and the model seam at
