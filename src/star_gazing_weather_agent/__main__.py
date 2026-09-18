@@ -1,4 +1,4 @@
-"""Entry point for ``python -m star_gazing_weather_agent``."""
+"""__main__: entry point for ``python -m star_gazing_weather_agent``."""
 
 from .cli import main
 

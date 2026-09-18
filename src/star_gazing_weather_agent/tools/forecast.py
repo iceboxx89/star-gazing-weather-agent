@@ -1,34 +1,17 @@
-"""Tool implementations for the Clear Sky agent.
+"""get_forecast: real cloud, seeing, wind and humidity from 7Timer's ASTRO
+product — free, no API key; GFS-derived, 3-day range at 3-hourly steps.
 
-get_forecast pulls real data from 7Timer's ASTRO product (free, no API key;
-GFS-derived, 3-day range at 3-hourly steps). get_moon_phase and
-get_todays_date are local helpers; the moon phase is still a stub.
-
-The function is the source of truth: its name, docstring and signature drive
-the schema the model sees (via litellm) and the registry the loop dispatches to.
+The model resolves an observing site to WGS84 decimal degrees; the tool snaps
+the forecast to the nearest point to 21:00 UTC of the requested date.
 """
 
-# litellm.utils.function_to_dict reflects signatures via annotation.__name__,
-# which fails on `X | None` (types.UnionType) — keep Optional here (2026-09-17).
-from collections.abc import Callable
 from datetime import datetime, timedelta, timezone
-from typing import Any, Optional, TypedDict
-from zoneinfo import ZoneInfo
+from typing import Optional, TypedDict
 
 import httpx
-import litellm
 
 SEVEN_TIMER_URL = "http://www.7timer.info/bin/astro.php"
 SEVEN_TIMER_TIMEOUT = 10.0
-
-LOCATION_TO_TIMEZONE: dict[str, str] = {
-    "Mauna Kea": "Pacific/Honolulu",
-    "Chile": "America/Santiago",
-    "Arizona": "America/Phoenix",
-    "Hawaii": "Pacific/Honolulu",
-    "California": "America/Los_Angeles",
-    "UK": "Europe/London",
-}
 
 # 7Timer band -> midpoint, so values are usable numbers rather than bands.
 SEEING_ARCSEC: dict[int, float] = {
@@ -65,14 +48,8 @@ class ForecastResult(TypedDict):
     humidity: int
 
 
-class MoonPhaseResult(TypedDict):
-    """Shape of get_moon_phase output: illumination % and moon set time."""
-
-    date: str
-    illumination: int
-    sets: str
-
-
+# Optional, not `X | None`: litellm's function_to_dict crashes on union
+# signatures (2026-09-17).
 async def get_forecast(
     lat: float, lon: float, date: Optional[str] = None
 ) -> ForecastResult:
@@ -123,35 +100,3 @@ async def get_forecast(
         "wind": round(point["wind10m"]["speed"] * 3.6),  # m/s -> km/h
         "humidity": point["rh2m"],
     }
-
-
-def get_moon_phase(date: str) -> MoonPhaseResult:
-    """Moon phase — illumination percent and set time for a date."""
-    return {"date": date, "illumination": 60, "sets": "23:40"}
-
-
-def get_todays_date(location: str) -> str:
-    """Return today's date in the locale format for the given location.
-
-    Pass a known location name (e.g. 'Mauna Kea', 'Chile', 'UK') from
-    LOCATION_TO_TIMEZONE.
-    """
-    tz_name = LOCATION_TO_TIMEZONE.get(location, "UTC")
-    now = datetime.now(ZoneInfo(tz_name))
-    return now.strftime("%A %-d %B %Y")
-
-
-TOOL_FUNCTIONS: tuple[Callable[..., Any], ...] = (
-    get_forecast,
-    get_moon_phase,
-    get_todays_date,
-)
-
-TOOLS: list[dict[str, Any]] = [
-    {"type": "function", "function": litellm.utils.function_to_dict(fn)}
-    for fn in TOOL_FUNCTIONS
-]
-
-TOOL_REGISTRY: dict[str, Callable[..., Any]] = {
-    fn.__name__: fn for fn in TOOL_FUNCTIONS
-}

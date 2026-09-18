@@ -1,4 +1,4 @@
-"""Transcript message for the Clear Sky agent loop.
+"""ChatMessage: one transcript entry in the Clear Sky agent loop.
 
 All four roles share one shape: role + optional fields that are only set for
 the role that needs them (tool_call_id on tool results, tool_calls on filtered

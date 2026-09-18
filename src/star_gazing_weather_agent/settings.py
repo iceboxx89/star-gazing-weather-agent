@@ -1,4 +1,5 @@
-"""Typed app config. Values come from the environment; the .env file is read as a fallback (env vars win)."""
+"""Settings: typed app config; values come from the environment, with the
+.env file read as a fallback (env vars win)."""
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 

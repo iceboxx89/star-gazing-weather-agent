@@ -4,10 +4,17 @@ Re-exports the public surface so callers can do either::
 
     from star_gazing_weather_agent import ask_agent
 
-or reach the internals via :mod:`star_gazing_weather_agent.agent`.
+or reach the internals via :mod:`star_gazing_weather_agent.agents`.
 """
 
-from .agent import MAX_ITERATIONS, ask_agent, run
+from .agents import StarGazingIntentClassifier, StarGazingWeatherAgent, ask_agent
+from .constants import MAX_ITERATIONS
 from .messages import ChatMessage
 
-__all__ = ["MAX_ITERATIONS", "ChatMessage", "ask_agent", "run"]
+__all__ = [
+    "MAX_ITERATIONS",
+    "ChatMessage",
+    "StarGazingIntentClassifier",
+    "StarGazingWeatherAgent",
+    "ask_agent",
+]

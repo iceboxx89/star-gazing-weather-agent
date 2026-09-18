@@ -1,12 +1,10 @@
-"""Command-line interface for the Star Gazing Weather agent.
+"""cli: the Typer + Rich surface over the service layer.
 
-Typer + Rich front-end: renders the agent's final answer as a markdown panel
-and shows a live spinner while the model is being asked. Reachable as the
-``star-gazing-weather-agent`` console script and ``python -m star_gazing_weather_agent``,
-both funneling through ``main()``.
+The CLI owns nothing about how the agent runs: it renders the question, the
+spinner, and the outcome panels, and maps failures to exit codes. All
+orchestration lives in service.ask.
 """
 
-import asyncio
 import logging
 from typing import Annotated
 
@@ -15,7 +13,9 @@ from rich.console import Console
 from rich.markdown import Markdown
 from rich.panel import Panel
 
-from .agent import MAX_ITERATIONS, ask_agent, settings
+from . import service
+from .constants import MAX_ITERATIONS
+from .logging import configure_logging
 
 log = logging.getLogger("star-gazing-weather-agent")
 console = Console()
@@ -58,10 +58,8 @@ def ask(
     text = " ".join(question)
 
     try:
-        with console.status(
-            f"[cyan]Asking {settings.qualified_model}…[/]", spinner="dots"
-        ):
-            answer = asyncio.run(ask_agent(text))
+        with console.status("[cyan]Asking the star-gazing agent…[/]", spinner="dots"):
+            answer = service.ask(text)
     except Exception as e:
         console.print(Panel(str(e), title="Error", border_style="red", padding=(1, 2)))
         raise typer.Exit(code=1)
@@ -71,7 +69,6 @@ def ask(
             f"[yellow]No answer after {MAX_ITERATIONS} iterations — raising the "
             "cap or rephrasing may help.[/]"
         )
-        log.warning("hit iteration cap of %d without a final answer", MAX_ITERATIONS)
     else:
         console.print(
             Panel(Markdown(answer), title="Answer", border_style="cyan", padding=(1, 2))
@@ -81,4 +78,5 @@ def ask(
 
 def main() -> None:
     """Console-script and ``python -m`` entry point."""
+    configure_logging()
     typer.run(ask)

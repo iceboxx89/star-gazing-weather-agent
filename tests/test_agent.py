@@ -13,8 +13,9 @@ import pytest
 from litellm import ModelResponse
 from litellm.types.utils import ChatCompletionMessageToolCall, Choices, Message
 
-import star_gazing_weather_agent.agent as ask
-from star_gazing_weather_agent.agent import ask_agent, run
+import star_gazing_weather_agent.agents.star_gazing_weather_agent as ask
+from star_gazing_weather_agent.agents import StarGazingWeatherAgent, ask_agent
+from star_gazing_weather_agent.constants import HELP_MESSAGE, REFUSAL_MESSAGE
 from star_gazing_weather_agent.messages import ChatMessage
 
 
@@ -30,7 +31,7 @@ class FakeModel:
         self.call_count = 0
         self.requests: list[list[dict[str, Any]]] = []
 
-    def __call__(self, **kwargs: Any) -> ModelResponse:
+    async def __call__(self, **kwargs: Any) -> ModelResponse:
         self.call_count += 1
         self.requests.append(kwargs["messages"])
         return ModelResponse(
@@ -97,7 +98,9 @@ def test_run_dispatch_and_observe() -> None:
         ]
     )
 
-    answer = asyncio.run(run(messages, model_fn=fake, max_iterations=3))
+    answer = asyncio.run(
+        StarGazingWeatherAgent(model_fn=fake).run(messages, max_iterations=3)
+    )
 
     assert answer == "final answer"
     assert [m.role for m in messages] == ["user", "assistant", "tool", "assistant"]
@@ -119,17 +122,17 @@ def test_happy_path_two_tool_calls_then_final_answer(
     """Happy path: two tool calls in one reply, both dispatched, prose out.
 
     Tools are faked too: the registry is swapped for spy functions registered
-    only for this test, so nothing in tools.py runs.
+    only for this test, so no real tool module runs.
     """
     forecast = {"site": "Milton Keynes", "cloud": 15}
     moon = {"date": "2026-09-16", "illumination": 60}
     tool_calls_made: list[dict[str, Any]] = []
 
-    def fake_forecast(**kwargs: Any) -> dict[str, Any]:
+    async def fake_forecast(**kwargs: Any) -> dict[str, Any]:
         tool_calls_made.append(kwargs)
         return forecast
 
-    def fake_moon(**kwargs: Any) -> dict[str, Any]:
+    async def fake_moon(**kwargs: Any) -> dict[str, Any]:
         tool_calls_made.append(kwargs)
         return moon
 
@@ -152,7 +155,9 @@ def test_happy_path_two_tool_calls_then_final_answer(
         ]
     )
 
-    answer = asyncio.run(run(messages, model_fn=fake, max_iterations=3))
+    answer = asyncio.run(
+        StarGazingWeatherAgent(model_fn=fake).run(messages, max_iterations=3)
+    )
 
     assert answer == "Tonight fits: clear skies, moon low."
     # Both tools ran, in request order, with parsed arguments.
@@ -208,7 +213,7 @@ def test_help_intent_returns_usage_text() -> None:
 
     answer = asyncio.run(ask_agent("how do i use this tool?", model_fn=fake))
 
-    assert answer == ask.HELP_MESSAGE
+    assert answer == HELP_MESSAGE
     assert fake.call_count == 1
 
 
@@ -219,7 +224,7 @@ def test_unknown_intent_reply_fails_closed() -> None:
 
     answer = asyncio.run(ask_agent("anything goes?", model_fn=fake))
 
-    assert answer == ask.REFUSAL_MESSAGE
+    assert answer == REFUSAL_MESSAGE
     assert fake.call_count == 1
 
 
@@ -230,7 +235,7 @@ def test_other_intent_returns_refusal() -> None:
 
     answer = asyncio.run(ask_agent("what is the capital of France?", model_fn=fake))
 
-    assert answer == ask.REFUSAL_MESSAGE
+    assert answer == REFUSAL_MESSAGE
     assert fake.call_count == 1
 
 
@@ -260,7 +265,9 @@ def test_non_observing_question_is_refused() -> None:
         [answer_message("REFUSED: I only answer observing questions.")]
     )
 
-    answer = asyncio.run(run(messages, model_fn=fake, max_iterations=3))
+    answer = asyncio.run(
+        StarGazingWeatherAgent(model_fn=fake).run(messages, max_iterations=3)
+    )
 
     assert answer == "REFUSED: I only answer observing questions."
     assert fake.call_count == 1
@@ -286,7 +293,9 @@ def test_tool_less_reply_is_steered_back_to_tools(
         ]
     )
 
-    answer = asyncio.run(run(messages, model_fn=fake, max_iterations=5))
+    answer = asyncio.run(
+        StarGazingWeatherAgent(model_fn=fake).run(messages, max_iterations=5)
+    )
 
     assert answer == "Forecast says clear."
     assert [m.role for m in messages] == [
@@ -312,7 +321,9 @@ def test_run_unknown_tool_reports_error() -> None:
         ]
     )
 
-    answer = asyncio.run(run(messages, model_fn=fake, max_iterations=3))
+    answer = asyncio.run(
+        StarGazingWeatherAgent(model_fn=fake).run(messages, max_iterations=3)
+    )
 
     assert answer == "recovered"
     assert [m.role for m in messages] == ["user", "assistant", "tool", "assistant"]
@@ -330,7 +341,9 @@ def test_run_hits_iteration_cap() -> None:
         ]
     )
 
-    answer = asyncio.run(run(messages, model_fn=fake, max_iterations=2))
+    answer = asyncio.run(
+        StarGazingWeatherAgent(model_fn=fake).run(messages, max_iterations=2)
+    )
 
     assert answer is None
     assert [m.role for m in messages] == [
