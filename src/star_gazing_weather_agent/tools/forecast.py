@@ -69,20 +69,25 @@ async def get_forecast(
         target_day.year, target_day.month, target_day.day, 21, tzinfo=timezone.utc
     )
 
-    async with httpx.AsyncClient(timeout=SEVEN_TIMER_TIMEOUT) as client:
-        resp = await client.get(
-            SEVEN_TIMER_URL,
-            params={
-                "lon": lon,
-                "lat": lat,
-                "ac": "0",
-                "unit": "metric",
-                "output": "json",
-                "tzshift": "0",
-            },
-        )
-        resp.raise_for_status()
-        payload = resp.json()
+    try:
+        async with httpx.AsyncClient(timeout=SEVEN_TIMER_TIMEOUT) as client:
+            resp = await client.get(
+                SEVEN_TIMER_URL,
+                params={
+                    "lon": lon,
+                    "lat": lat,
+                    "ac": "0",
+                    "unit": "metric",
+                    "output": "json",
+                    "tzshift": "0",
+                },
+            )
+            resp.raise_for_status()
+            payload = resp.json()
+    except httpx.HTTPError as e:
+        raise RuntimeError(f"7Timer request failed: {e}") from e
+    except ValueError as e:
+        raise RuntimeError(f"7Timer returned invalid JSON: {e}") from e
 
     init = datetime.strptime(payload["init"], "%Y%m%d%H").replace(tzinfo=timezone.utc)
     data = payload["dataseries"]
