@@ -40,12 +40,11 @@ HELP_MESSAGE = (
 
 INTENT_PROMPT = (
     "You are the doorman for a star-gazing weather advisor. Classify the "
-    "user's question by replying with exactly one word only:\n"
+    "user's question:\n"
     "OBSERVE — the question asks about observing the night sky, astronomy "
     "conditions, or a site's observing weather;\n"
     "HELP — the user is asking how to use this advisor or its commands;\n"
-    "OTHER — anything else.\n"
-    "Reply with only that word, no punctuation or explanation."
+    "OTHER — anything else."
 )
 
 REFUSAL_MESSAGE = (

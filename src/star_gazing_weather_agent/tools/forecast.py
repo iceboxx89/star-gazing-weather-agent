@@ -6,9 +6,11 @@ the forecast to the nearest point to 21:00 UTC of the requested date.
 """
 
 from datetime import datetime, timedelta, timezone
-from typing import Optional, TypedDict
+from typing import TypedDict
 
 import httpx
+
+from ._toolset import observing_tool
 
 SEVEN_TIMER_URL = "http://www.7timer.info/bin/astro.php"
 SEVEN_TIMER_TIMEOUT = 10.0
@@ -41,17 +43,16 @@ class ForecastResult(TypedDict):
     """Shape of get_forecast output: cloud %, seeing arcsec, wind km/h, humidity."""
 
     site: str
-    date: Optional[str]
+    date: str | None
     cloud: int
     seeing: float
     wind: int
     humidity: int
 
 
-# Optional, not `X | None`: litellm's function_to_dict crashes on union
-# signatures (2026-09-17).
+@observing_tool
 async def get_forecast(
-    lat: float, lon: float, date: Optional[str] = None
+    lat: float, lon: float, date: str | None = None
 ) -> ForecastResult:
     """Cloud cover, seeing, wind and humidity at a decimal-degree coordinate.
 

@@ -8,8 +8,12 @@ results is the orchestrator's job, one level up.
 import logging
 from enum import Enum
 
+from pydantic_ai import Agent
+from pydantic_ai.exceptions import UnexpectedModelBehavior
+from pydantic_ai.models import Model
+
 from ..constants import INTENT_PROMPT
-from ._base import AgentBase
+from ..settings import Settings
 
 log = logging.getLogger("clear-sky")
 
@@ -22,25 +26,30 @@ class Intent(Enum):
     OTHER = "OTHER"
 
 
-class StarGazingIntentClassifier(AgentBase):
+class StarGazingIntentClassifier:
     """Decide a question's intent: OBSERVE, HELP, or OTHER."""
 
-    async def classify(self, question: str) -> Intent:
-        """One no-tool model call with a tiny token budget; returns an Intent."""
-        response = await self._call_llm(
-            model=self.settings.qualified_model,
-            messages=[
-                {"role": "system", "content": INTENT_PROMPT},
-                {"role": "user", "content": question},
-            ],
-            api_key=self.settings.api_key,
-            max_tokens=8,
-            num_retries=self.settings.max_retries,
+    def __init__(
+        self,
+        model: Model | None = None,
+        settings: Settings | None = None,
+    ) -> None:
+        self.settings = settings or Settings()
+        self.agent = Agent(
+            model or self.settings.build_model(),
+            deps_type=type(None),
+            system_prompt=INTENT_PROMPT,
+            output_type=Intent,
+            model_settings=self.settings.model_settings(),
+            # No retries: an unusable reply fails closed to OTHER in one call.
+            retries=0,
         )
-        content = (response.choices[0].message.content or "").strip().upper()
-        first_word = content.split(maxsplit=1)[0].rstrip(".,;:!?")
-        for intent in Intent:
-            if first_word == intent.value:
-                return intent
-        log.warning("intent gate got an unrecognised reply %r; refusing", content)
-        return Intent.OTHER
+
+    async def classify(self, question: str) -> Intent:
+        """One no-tool call returning a validated Intent; OTHER on failure."""
+        try:
+            result = await self.agent.run(question)
+        except UnexpectedModelBehavior:
+            log.warning("intent gate got an unusable reply; refusing")
+            return Intent.OTHER
+        return result.output

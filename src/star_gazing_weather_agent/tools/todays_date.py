@@ -8,6 +8,8 @@ guess the date.
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
+from ._toolset import observing_tool
+
 LOCATION_TO_TIMEZONE: dict[str, str] = {
     "Mauna Kea": "Pacific/Honolulu",
     "Chile": "America/Santiago",
@@ -18,6 +20,7 @@ LOCATION_TO_TIMEZONE: dict[str, str] = {
 }
 
 
+@observing_tool
 async def get_todays_date(location: str) -> str:
     """Return today's date in the locale format for the given location.
 

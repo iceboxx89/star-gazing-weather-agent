@@ -6,7 +6,8 @@ agent loop.
 - **Package:** `star_gazing_weather_agent` (src layout)
 - **CLI:** `star-gazing-weather-agent` console script or `python -m star_gazing_weather_agent`
 - **Public API:** `ask_agent(question)` (async) and `service.ask(question)` (sync);
-  both take an injectable model callable, so tests drive a fake model end to end
+  both take an injectable pydantic-ai model, so tests drive a scripted model
+  end to end
 
 ```mermaid
 flowchart LR
@@ -37,17 +38,20 @@ cli (Typer + Rich)                      → renders, exit codes, nothing else
     → agents.ask_agent (async)          → routes the Intent, plain function
       → StarGazingIntentClassifier      → OBSERVE / HELP / OTHER
       → StarGazingWeatherAgent          → tool-grounding loop
-        → _call_llm                     → injected model callable (AgentBase)
+        → pydantic-ai Agent             → injected model + observing tools
 ```
 
-The observing loop is a small state machine: wait for the model, execute any
-requested tools, feed the results back — repeating until the model answers
-grounded in tool observations, or formally refuses with a `REFUSED:` prefix.
-Replies that dodge the tools are steered back onto them. Narration text is
-filtered out of the transcript mid-loop. The whole layer under `service.ask`
-is async and free of Typer/Rich, so any front end can drive it.
+The observing loop is pydantic-ai's `Agent`: it waits for the model, executes
+any requested tools, and feeds the results back — repeating until the model
+answers grounded in a tool observation, or formally refuses with a `REFUSED:`
+prefix. A reply that dodges the tools is rejected by an output validator and
+sent back with a nudge. The whole layer under `service.ask` is async and free
+of Typer/Rich, so any front end can drive it.
 
 ## Tools
+
+Each tool registers itself on the shared toolset with `@observing_tool` at its
+definition site, so its name, docstring and signature are its schema.
 
 - `get_forecast` — real data from 7Timer's ASTRO product (free, no API key;
   GFS-derived, 3-day range at 3-hourly steps)
@@ -62,10 +66,10 @@ make env    # copies .env.tmp to .env — then edit it
 uv sync
 ```
 
-The agent calls the model through LiteLLM, which supports any of its many
-providers (Groq, OpenAI, Anthropic, local endpoints, ...). Fill `API_KEY`,
-`PROVIDER` and `MODEL` in `.env` with a key that the provider you picked
-accepts — then run the agent.
+The agent calls the model through pydantic-ai. Fill `API_KEY`, `PROVIDER` and
+`MODEL` in `.env` with a key the provider accepts; for any OpenAI-compatible
+endpoint, set `API_BASE` and put just the model id in `MODEL` — then run the
+agent.
 
 ## Run
 

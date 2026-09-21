@@ -9,8 +9,8 @@ description = "Clear Sky observing advisor: decide if tonight is good for telesc
 requires-python = ">=3.10"
 dependencies = [
     "httpx>=0.28.1",
-    "litellm>=1.83.0",
     "pydantic>=2.13.5",
+    "pydantic-ai[groq]>=2.46.0",
     "pydantic-settings>=2.15.0",
     "rich>=15.0.0",
     "typer>=0.27.2",

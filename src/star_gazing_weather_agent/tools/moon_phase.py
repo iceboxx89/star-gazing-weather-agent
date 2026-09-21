@@ -7,6 +7,8 @@ source before moon-dependent answers are trustworthy.
 
 from typing import TypedDict
 
+from ._toolset import observing_tool
+
 
 class MoonPhaseResult(TypedDict):
     """Shape of get_moon_phase output: illumination % and moon set time."""
@@ -16,6 +18,7 @@ class MoonPhaseResult(TypedDict):
     sets: str
 
 
+@observing_tool
 async def get_moon_phase(date: str) -> MoonPhaseResult:
     """Moon phase — illumination percent and set time for a date."""
     return {"date": date, "illumination": 60, "sets": "23:40"}
